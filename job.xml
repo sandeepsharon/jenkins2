@@ -1,0 +1,70 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.31">
+    <actions/>
+    <description>hello bro</description>
+    <displayName>sam</displayName>
+    <keepDependencies>false</keepDependencies>
+    <properties>
+        <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+            <triggers>
+                <hudson.triggers.SCMTrigger>
+                    <spec>H/3 * * * *</spec>
+                    <ignorePostCommitHooks>false</ignorePostCommitHooks>
+                </hudson.triggers.SCMTrigger>
+            </triggers>
+        </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+    </properties>
+    <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.61">
+        <script>
+            node{
+            cleanWs()
+            stage(&apos;scm&apos;) {
+            git branch: &apos;Demo_Instance&apos;, credentialsId: &apos;Renjith&apos;, url: &apos;https://github.com/Polus-Software/fibi40-client.git&apos;
+            }
+            stage(&apos;Build&apos;){
+            handler = &quot;&quot;
+            try{
+            def nodeHome=&quot;/root/.nvm/versions/node/v11.5.0/bin&quot;
+            env.PATH=&quot;${nodeHome}:${env.PATH}&quot;
+            sh &apos;npm install moment --save&apos;
+            sh &quot;${nodeHome}/ng build --prod 2&gt; trap&quot;
+            }catch(Exception ex){
+            println(&quot;Bash Exception 1 handled &quot;)
+
+            }
+            try{
+            sh &quot;grep &apos;ERROR in&apos; trap &gt; errortrap&quot;
+            handler = readFile(&apos;errortrap&apos;).trim()
+
+            }catch(Exception ex){
+            println(&quot;Bash Exception 2 Handled&quot;)
+            }
+            echo &quot;${handler}&quot;
+            if (handler != &quot;&quot;){
+            println(&quot;Build failed&quot;)
+            echo &quot;${handler}&quot;
+            mail bcc: &apos;&apos;, body: &quot;Jenkins Angular BUILD FAILED with error: $handler&quot;, cc: &apos;renjith@polussoftware.com&apos;, from: &apos;&apos;, replyTo: &apos;&apos;, subject: &apos;BUILD FAILED&apos;, to: &apos;aravind.ps@polussoftware.com&apos;
+
+            //sh &quot;grep &apos;eminem&apos; trap &gt; demo&quot;
+            throw new Exception(&quot;Angular Exception&quot;)
+            }else{
+            println(&quot;Build success&quot;)
+            mail bcc: &apos;&apos;, body: &quot;Jenkins Angular BUILD SUCCESS | You can check the application at http://192.168.1.139:8080/fibi_load&quot;, cc: &apos;renjith@polussoftware.com&apos;, from: &apos;&apos;, replyTo: &apos;&apos;, subject: &apos;BUILD SUCCESS&apos;, to: &apos;aravind.ps@polussoftware.com&apos;
+            }
+
+            }
+            stage(&apos;Deploy&apos;) {
+            sh &quot;mkdir fibi_load&quot;
+            sh &quot;cp -R dist/* fibi_load&quot;
+            sh &apos;ssh root@192.168.1.139 &quot;rm -rf /opt/tomcat/webapps/fibi_load&quot;&apos;
+            sshagent([&apos;139_front&apos;]){
+            sh &apos;scp -r -o StrictHostKeyChecking=no fibi_load root@192.168.1.139:/opt/tomcat/webapps/&apos;
+            }
+            }
+            }
+        </script>
+        <sandbox>false</sandbox>
+    </definition>
+    <triggers/>
+    <disabled>false</disabled>
+</flow-definition>
